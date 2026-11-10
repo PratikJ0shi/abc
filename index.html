@@ -4,10 +4,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Universal Video Downloader</title>
 
 <style>
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -27,21 +30,16 @@ body {
   text-align: center;
 }
 
-.logo {
-  font-size: 42px;
-  margin-bottom: 10px;
-}
-
 h1 {
   font-size: 34px;
-  margin-bottom: 10px;
 }
 
-h1 span { color: #38bdf8; }
+h1 span {
+  color: #38bdf8;
+}
 
 .subtitle {
   color: #aab5c8;
-  margin-bottom: 35px;
 }
 
 .download-box {
@@ -49,35 +47,43 @@ h1 span { color: #38bdf8; }
   padding: 25px;
   border: 1px solid #29364d;
   border-radius: 18px;
+  margin-top: 25px;
 }
 
-input {
+label {
+  display: block;
+  text-align: left;
+  margin: 18px 0 8px;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+input, select {
   width: 100%;
-  padding: 17px;
-  border-radius: 10px;
+  padding: 15px;
+  border-radius: 9px;
   border: 1px solid #475569;
   background: #0b1020;
   color: white;
   font-size: 15px;
-  outline: none;
 }
 
-input:focus { border-color: #38bdf8; }
+select {
+  cursor: pointer;
+}
 
 button {
   width: 100%;
-  margin-top: 15px;
-  padding: 17px;
+  margin-top: 20px;
+  padding: 16px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #0284c7;
   color: white;
   font-size: 17px;
   font-weight: bold;
   cursor: pointer;
 }
-
-button:hover { background: #0369a1; }
 
 button:disabled {
   opacity: .6;
@@ -90,26 +96,12 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-.features {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 25px;
-}
-
-.feature {
-  background: #172033;
-  padding: 17px 8px;
-  border-radius: 12px;
-  color: #cbd5e1;
-  font-size: 13px;
-}
-
-footer {
-  color: #64748b;
-  margin-top: 30px;
+.note {
+  color: #94a3b8;
   font-size: 12px;
+  margin-top: 15px;
 }
+
 </style>
 </head>
 
@@ -117,53 +109,51 @@ footer {
 
 <div class="container">
 
-  <div class="logo">▶</div>
+<h1>Universal <span>Downloader</span></h1>
 
-  <h1>Universal <span>Downloader</span></h1>
+<p class="subtitle">
+Select your preferred video quality
+</p>
 
-  <p class="subtitle">
-    Download videos from supported direct video links.
-  </p>
+<div class="download-box">
 
-  <div class="download-box">
+<label>360p Video URL</label>
+<input id="url360" type="url"
+placeholder="Paste 360p video URL">
 
-    <input
-      type="url"
-      id="videoUrl"
-      placeholder="Paste your direct MP4 video URL..."
-    >
+<label>480p Video URL</label>
+<input id="url480" type="url"
+placeholder="Paste 480p video URL">
 
-    <button id="downloadBtn" onclick="downloadVideo()">
-      Download Video
-    </button>
+<label>720p Video URL</label>
+<input id="url720" type="url"
+placeholder="Paste 720p video URL">
 
-    <div id="status" role="status"></div>
+<label>1080p Video URL</label>
+<input id="url1080" type="url"
+placeholder="Paste 1080p video URL">
 
-  </div>
+<label>Select Video Quality</label>
 
-  <div class="features">
+<select id="quality">
+<option value="360">360p</option>
+<option value="480">480p</option>
+<option value="720" selected>720p</option>
+<option value="1080">1080p</option>
+</select>
 
-    <div class="feature">
-      <strong>MP4</strong>
-      <p>Video files</p>
-    </div>
+<button id="downloadBtn" onclick="downloadVideo()">
+Download Video
+</button>
 
-    <div class="feature">
-      <strong>Secure</strong>
-      <p>Restricted hosts</p>
-    </div>
+<div id="status" role="status"></div>
 
-    <div class="feature">
-      <strong>Streaming</strong>
-      <p>File delivery</p>
-    </div>
+<p class="note">
+Only use authorized video URLs. The selected quality
+must have a corresponding source file.
+</p>
 
-  </div>
-
-  <footer>
-    Only download videos you own or are authorized to download.
-  </footer>
-
+</div>
 </div>
 
 <script>
@@ -173,51 +163,75 @@ const WORKER_URL =
 
 async function downloadVideo() {
 
-  const input = document.getElementById("videoUrl");
-  const status = document.getElementById("status");
-  const button = document.getElementById("downloadBtn");
+  const quality =
+    document.getElementById("quality").value;
+
+  const input =
+    document.getElementById("url" + quality);
+
+  const status =
+    document.getElementById("status");
+
+  const button =
+    document.getElementById("downloadBtn");
 
   try {
 
-    const url = new URL(input.value);
-
-    if (url.protocol !== "https:") {
-      throw new Error("HTTPS video URL required.");
+    if (!input.value.trim()) {
+      throw new Error(
+        "Selected quality URL is missing."
+      );
     }
 
-    status.textContent = "Checking video source...";
+    const videoUrl = new URL(input.value);
+
+    if (videoUrl.protocol !== "https:") {
+      throw new Error("HTTPS URL required.");
+    }
+
+    status.textContent =
+      "Connecting to video server...";
+
     button.disabled = true;
 
-    const downloadUrl =
-      WORKER_URL + "/download?url=" +
-      encodeURIComponent(url.href);
+    const apiUrl =
+      WORKER_URL +
+      "/download?url=" +
+      encodeURIComponent(videoUrl.href);
 
-    const response = await fetch(downloadUrl);
+    const response = await fetch(apiUrl);
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || "Download failed");
+      const error = await response.json();
+      throw new Error(error.error || "Download failed");
     }
 
     const blob = await response.blob();
 
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    const objectUrl =
+      URL.createObjectURL(blob);
+
+    const link =
+      document.createElement("a");
 
     link.href = objectUrl;
-    link.download = "video.mp4";
+    link.download = "video-" + quality + "p.mp4";
 
     document.body.appendChild(link);
     link.click();
     link.remove();
 
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+    setTimeout(() => {
+      URL.revokeObjectURL(objectUrl);
+    }, 60000);
 
-    status.textContent = "Download started successfully!";
+    status.textContent =
+      quality + "p download started successfully!";
 
   } catch (error) {
 
-    status.textContent = "Error: " + error.message;
+    status.textContent =
+      "Error: " + error.message;
 
   } finally {
 
