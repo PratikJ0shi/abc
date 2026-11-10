@@ -80,25 +80,36 @@
     <div id="status"></div>
   </div>
 
-  <script>
-    function downloadVideo() {
-      const url = document.getElementById("videoUrl").value;
-      const status = document.getElementById("status");
+ 
+<script>
+  // Yahan apna actual Cloudflare Worker URL paste karo
+  const WORKER_URL =
+    "https://abc.connect-pratikjoshi.workers.dev/";
 
-      try {
-        const parsed = new URL(url);
+  function downloadVideo() {
+    const input = document.getElementById("videoUrl");
+    const status = document.getElementById("status");
 
-        if (!["http:", "https:"].includes(parsed.protocol)) {
-          throw new Error("Invalid URL");
-        }
+    try {
+      const videoUrl = new URL(input.value);
 
-        status.textContent =
-          "URL received. Backend connection is the next step.";
-
-      } catch (error) {
-        status.textContent = "Please enter a valid video URL.";
+      if (!["https:", "http:"].includes(videoUrl.protocol)) {
+        throw new Error("Invalid URL");
       }
+
+      status.textContent = "Connecting to server...";
+
+      const downloadUrl =
+        WORKER_URL + "/download?url=" +
+        encodeURIComponent(videoUrl.href);
+
+      window.location.assign(downloadUrl);
+
+      status.textContent = "Download request sent.";
+    } catch (error) {
+      status.textContent = "Please enter a valid video URL.";
     }
-  </script>
+  }
+</script>
 </body>
 </html>
