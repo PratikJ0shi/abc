@@ -2,246 +2,194 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Video Downloader</title>
+  <style>
+    * { box-sizing: border-box; }
 
-<title>Universal Video Downloader</title>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #101827;
+      color: white;
+    }
 
-<style>
-* {
-  box-sizing: border-box;
-}
+    .container {
+      width: 100%;
+      max-width: 600px;
+      padding: 30px;
+      border-radius: 16px;
+      background: #1d293b;
+      text-align: center;
+    }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: #0b1020;
-  color: white;
-  font-family: Arial, sans-serif;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-}
+    h1 { margin-top: 0; }
 
-.container {
-  width: 100%;
-  max-width: 650px;
-  text-align: center;
-}
+    input {
+      width: 100%;
+      padding: 15px;
+      margin: 15px 0;
+      border: 1px solid #526176;
+      border-radius: 8px;
+      background: #101827;
+      color: white;
+      font-size: 15px;
+    }
 
-h1 {
-  font-size: 34px;
-}
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 10px;
+      border: 0;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
 
-h1 span {
-  color: #38bdf8;
-}
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
 
-.subtitle {
-  color: #aab5c8;
-}
+    #status {
+      margin-top: 20px;
+      overflow-wrap: anywhere;
+      line-height: 1.5;
+    }
 
-.download-box {
-  background: #172033;
-  padding: 25px;
-  border: 1px solid #29364d;
-  border-radius: 18px;
-  margin-top: 25px;
-}
+    .video-item {
+      margin-top: 15px;
+      padding: 15px;
+      border: 1px solid #526176;
+      border-radius: 8px;
+      overflow-wrap: anywhere;
+    }
 
-label {
-  display: block;
-  text-align: left;
-  margin: 18px 0 8px;
-  color: #cbd5e1;
-  font-size: 14px;
-}
-
-input, select {
-  width: 100%;
-  padding: 15px;
-  border-radius: 9px;
-  border: 1px solid #475569;
-  background: #0b1020;
-  color: white;
-  font-size: 15px;
-}
-
-select {
-  cursor: pointer;
-}
-
-button {
-  width: 100%;
-  margin-top: 20px;
-  padding: 16px;
-  border: 0;
-  border-radius: 9px;
-  background: #0284c7;
-  color: white;
-  font-size: 17px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: .6;
-  cursor: wait;
-}
-
-#status {
-  margin-top: 18px;
-  color: #7dd3fc;
-  overflow-wrap: anywhere;
-}
-
-.note {
-  color: #94a3b8;
-  font-size: 12px;
-  margin-top: 15px;
-}
-
-</style>
+    .note {
+      color: #b8c4d5;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 20px;
+    }
+  </style>
 </head>
-
 <body>
 
-<div class="container">
+  <main class="container">
+    <h1>Universal Video Downloader</h1>
+    <p>Paste a video page URL below</p>
 
-<h1>Universal <span>Downloader</span></h1>
+    <input
+      id="videoUrl"
+      type="url"
+      placeholder="https://example.com/video"
+    >
 
-<p class="subtitle">
-Select your preferred video quality
-</p>
+    <button id="analyzeBtn" onclick="analyzeVideo()">
+      Analyze Video
+    </button>
 
-<div class="download-box">
+    <div id="status" role="status"></div>
+    <div id="results"></div>
 
-<label>360p Video URL</label>
-<input id="url360" type="url"
-placeholder="Paste 360p video URL">
+    <p class="note">
+      Current test version supports only approved domains
+      and direct video downloads. DRM, HLS and DASH are
+      not supported.
+    </p>
+  </main>
 
-<label>480p Video URL</label>
-<input id="url480" type="url"
-placeholder="Paste 480p video URL">
+  <script>
+    const WORKER =
+      "https://abc.connect-pratikjoshi.workers.dev";
 
-<label>720p Video URL</label>
-<input id="url720" type="url"
-placeholder="Paste 720p video URL">
+    async function analyzeVideo() {
+      const input = document.getElementById("videoUrl");
+      const status = document.getElementById("status");
+      const results = document.getElementById("results");
+      const button = document.getElementById("analyzeBtn");
 
-<label>1080p Video URL</label>
-<input id="url1080" type="url"
-placeholder="Paste 1080p video URL">
+      const value = input.value.trim();
 
-<label>Select Video Quality</label>
+      results.innerHTML = "";
 
-<select id="quality">
-<option value="360">360p</option>
-<option value="480">480p</option>
-<option value="720" selected>720p</option>
-<option value="1080">1080p</option>
-</select>
+      if (!value) {
+        status.textContent = "Please enter a video URL.";
+        return;
+      }
 
-<button id="downloadBtn" onclick="downloadVideo()">
-Download Video
-</button>
+      let parsed;
 
-<div id="status" role="status"></div>
+      try {
+        parsed = new URL(value);
+      } catch {
+        status.textContent = "Invalid URL.";
+        return;
+      }
 
-<p class="note">
-Only use authorized video URLs. The selected quality
-must have a corresponding source file.
-</p>
+      if (parsed.protocol !== "https:") {
+        status.textContent = "Only HTTPS URLs are supported.";
+        return;
+      }
 
-</div>
-</div>
+      button.disabled = true;
+      status.textContent = "Analyzing...";
 
-<script>
+      try {
+        const endpoint =
+          WORKER + "/analyze?url=" + encodeURIComponent(value);
 
-const WORKER_URL =
-"https://abc.connect-pratikjoshi.workers.dev";
+        const response = await fetch(endpoint);
+        const data = await response.json();
 
-async function downloadVideo() {
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "Analysis failed.");
+        }
 
-  const quality =
-    document.getElementById("quality").value;
+        status.textContent =
+          "Analysis complete. Found " + data.count + " video(s).";
 
-  const input =
-    document.getElementById("url" + quality);
+        if (!data.videos.length) {
+          status.textContent +=
+            " No video source was found in the page HTML.";
+        }
 
-  const status =
-    document.getElementById("status");
+        data.videos.forEach((video, index) => {
+          const item = document.createElement("div");
+          item.className = "video-item";
 
-  const button =
-    document.getElementById("downloadBtn");
+          const heading = document.createElement("p");
+          heading.textContent =
+            "Video " + (index + 1) + " — " + video.type;
 
-  try {
+          const link = document.createElement("a");
+          link.href =
+            WORKER + "/download?url=" +
+            encodeURIComponent(video.url);
+          link.textContent = "Download video";
+          link.style.color = "#7db3ff";
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
 
-    if (!input.value.trim()) {
-      throw new Error(
-        "Selected quality URL is missing."
-      );
+          item.appendChild(heading);
+          item.appendChild(link);
+          results.appendChild(item);
+        });
+
+      } catch (error) {
+        status.textContent = "Error: " + error.message;
+      } finally {
+        button.disabled = false;
+      }
     }
-
-    const videoUrl = new URL(input.value);
-
-    if (videoUrl.protocol !== "https:") {
-      throw new Error("HTTPS URL required.");
-    }
-
-    status.textContent =
-      "Connecting to video server...";
-
-    button.disabled = true;
-
-    const apiUrl =
-      WORKER_URL +
-      "/download?url=" +
-      encodeURIComponent(videoUrl.href);
-
-    const response = await fetch(apiUrl);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Download failed");
-    }
-
-    const blob = await response.blob();
-
-    const objectUrl =
-      URL.createObjectURL(blob);
-
-    const link =
-      document.createElement("a");
-
-    link.href = objectUrl;
-    link.download = "video-" + quality + "p.mp4";
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    setTimeout(() => {
-      URL.revokeObjectURL(objectUrl);
-    }, 60000);
-
-    status.textContent =
-      quality + "p download started successfully!";
-
-  } catch (error) {
-
-    status.textContent =
-      "Error: " + error.message;
-
-  } finally {
-
-    button.disabled = false;
-
-  }
-
-}
-
-</script>
+  </script>
 
 </body>
 </html>
