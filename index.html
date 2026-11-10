@@ -2,114 +2,232 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Universal Video Downloader</title>
-  <style>
-    * { box-sizing: border-box; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Video Downloader</title>
 
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #101827;
-      color: white;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 20px;
-    }
+<style>
+* { box-sizing: border-box; }
 
-    .container {
-      width: 100%;
-      max-width: 550px;
-      background: #1e293b;
-      padding: 35px;
-      border-radius: 18px;
-      text-align: center;
-    }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #0b1020;
+  color: white;
+  font-family: Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
 
-    h1 { color: #38bdf8; }
+.container {
+  width: 100%;
+  max-width: 650px;
+  text-align: center;
+}
 
-    p { color: #cbd5e1; }
+.logo {
+  font-size: 42px;
+  margin-bottom: 10px;
+}
 
-    input {
-      width: 100%;
-      padding: 15px;
-      margin: 20px 0;
-      border: 1px solid #475569;
-      border-radius: 8px;
-      background: #0f172a;
-      color: white;
-      font-size: 15px;
-    }
+h1 {
+  font-size: 34px;
+  margin-bottom: 10px;
+}
 
-    button {
-      width: 100%;
-      padding: 15px;
-      background: #0284c7;
-      color: white;
-      border: 0;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-    }
+h1 span { color: #38bdf8; }
 
-    button:hover { background: #0369a1; }
+.subtitle {
+  color: #aab5c8;
+  margin-bottom: 35px;
+}
 
-    #status {
-      margin-top: 20px;
-      font-size: 14px;
-    }
-  </style>
+.download-box {
+  background: #172033;
+  padding: 25px;
+  border: 1px solid #29364d;
+  border-radius: 18px;
+}
+
+input {
+  width: 100%;
+  padding: 17px;
+  border-radius: 10px;
+  border: 1px solid #475569;
+  background: #0b1020;
+  color: white;
+  font-size: 15px;
+  outline: none;
+}
+
+input:focus { border-color: #38bdf8; }
+
+button {
+  width: 100%;
+  margin-top: 15px;
+  padding: 17px;
+  border: 0;
+  border-radius: 10px;
+  background: #0284c7;
+  color: white;
+  font-size: 17px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover { background: #0369a1; }
+
+button:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+#status {
+  margin-top: 18px;
+  color: #7dd3fc;
+  overflow-wrap: anywhere;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.feature {
+  background: #172033;
+  padding: 17px 8px;
+  border-radius: 12px;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+footer {
+  color: #64748b;
+  margin-top: 30px;
+  font-size: 12px;
+}
+</style>
 </head>
+
 <body>
-  <div class="container">
-    <h1>Video Downloader</h1>
-    <p>Paste your direct video URL below</p>
+
+<div class="container">
+
+  <div class="logo">▶</div>
+
+  <h1>Universal <span>Downloader</span></h1>
+
+  <p class="subtitle">
+    Download videos from supported direct video links.
+  </p>
+
+  <div class="download-box">
 
     <input
       type="url"
       id="videoUrl"
-      placeholder="https://example.com/video.mp4"
+      placeholder="Paste your direct MP4 video URL..."
     >
 
-    <button onclick="downloadVideo()">
+    <button id="downloadBtn" onclick="downloadVideo()">
       Download Video
     </button>
 
-    <div id="status"></div>
+    <div id="status" role="status"></div>
+
   </div>
 
- 
+  <div class="features">
+
+    <div class="feature">
+      <strong>MP4</strong>
+      <p>Video files</p>
+    </div>
+
+    <div class="feature">
+      <strong>Secure</strong>
+      <p>Restricted hosts</p>
+    </div>
+
+    <div class="feature">
+      <strong>Streaming</strong>
+      <p>File delivery</p>
+    </div>
+
+  </div>
+
+  <footer>
+    Only download videos you own or are authorized to download.
+  </footer>
+
+</div>
+
 <script>
-  // Yahan apna actual Cloudflare Worker URL paste karo
-  const WORKER_URL =
-    "https://abc.connect-pratikjoshi.workers.dev/";
 
-  function downloadVideo() {
-    const input = document.getElementById("videoUrl");
-    const status = document.getElementById("status");
+const WORKER_URL =
+"https://abc.connect-pratikjoshi.workers.dev";
 
-    try {
-      const videoUrl = new URL(input.value);
+async function downloadVideo() {
 
-      if (!["https:", "http:"].includes(videoUrl.protocol)) {
-        throw new Error("Invalid URL");
-      }
+  const input = document.getElementById("videoUrl");
+  const status = document.getElementById("status");
+  const button = document.getElementById("downloadBtn");
 
-      status.textContent = "Connecting to server...";
+  try {
 
-      const downloadUrl =
-        WORKER_URL + "/download?url=" +
-        encodeURIComponent(videoUrl.href);
+    const url = new URL(input.value);
 
-      window.location.assign(downloadUrl);
-
-      status.textContent = "Download request sent.";
-    } catch (error) {
-      status.textContent = "Please enter a valid video URL.";
+    if (url.protocol !== "https:") {
+      throw new Error("HTTPS video URL required.");
     }
+
+    status.textContent = "Checking video source...";
+    button.disabled = true;
+
+    const downloadUrl =
+      WORKER_URL + "/download?url=" +
+      encodeURIComponent(url.href);
+
+    const response = await fetch(downloadUrl);
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Download failed");
+    }
+
+    const blob = await response.blob();
+
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = objectUrl;
+    link.download = "video.mp4";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+
+    status.textContent = "Download started successfully!";
+
+  } catch (error) {
+
+    status.textContent = "Error: " + error.message;
+
+  } finally {
+
+    button.disabled = false;
+
   }
+
+}
+
 </script>
+
 </body>
 </html>
