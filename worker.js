@@ -25,14 +25,20 @@ function json(data, status = 200) {
 }
 
 function validateURL(value) {
-  const u = new URL(value);
+  let u;
+
+  try {
+    u = new URL(value);
+  } catch {
+    throw new Error("Invalid URL.");
+  }
 
   if (u.protocol !== "https:") {
     throw new Error("Only HTTPS URLs are allowed.");
   }
 
   if (u.username || u.password) {
-    throw new Error("Credentials in URLs are not allowed.");
+    throw new Error("URL credentials are not allowed.");
   }
 
   if (u.port && u.port !== "443") {
@@ -41,20 +47,15 @@ function validateURL(value) {
 
   const host = u.hostname.toLowerCase();
 
-  if (
-    !ALLOWED_HOSTS.has(host) ||
-    host === "localhost" ||
-    host.endsWith(".local") ||
-    host.endsWith(".internal")
-  ) {
+  if (!ALLOWED_HOSTS.has(host)) {
     throw new Error("This domain is not in the allowed-host list.");
   }
 
   return u;
 }
 
-async function safeFetch(url, headers = {}) {
-  let current = validateURL(url);
+async function safeFetch(value, headers = {}) {
+  let current = validateURL(value);
 
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
     const response = await fetch(current.toString(), {
@@ -82,6 +83,10 @@ async function safeFetch(url, headers = {}) {
 }
 
 async function readLimited(response, limit) {
+  if (!response.body) {
+    throw new Error("Empty response.");
+  }
+
   const reader = response.body.getReader();
   const chunks = [];
   let total = 0;
@@ -89,6 +94,7 @@ async function readLimited(response, limit) {
   try {
     while (true) {
       const { done, value } = await reader.read();
+
       if (done) break;
 
       total += value.byteLength;
@@ -115,13 +121,20 @@ async function readLimited(response, limit) {
   return result;
 }
 
-function decodeHTML(value) {
-  return value
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
+function videoType(url, contentType = "") {
+  const path = new URL(url).pathname.toLowerCase();
+
+  if (path.endsWith(".mp4")) return "MP4";
+  if (path.endsWith(".webm")) return "WebM";
+  if (path.endsWith(".mov")) return "MOV";
+  if (path.endsWith(".m3u8")) return "HLS";
+  if (path.endsWith(".mpd")) return "DASH";
+
+  if (contentType.startsWith("video/")) {
+    return "Direct video";
+  }
+
+  return "Unknown";
 }
 
 function extractVideos(html, pageURL) {
@@ -130,43 +143,44 @@ function extractVideos(html, pageURL) {
   function add(value, source) {
     if (!value) return;
 
-    value = decodeHTML(value.trim());
+    value = value.trim()
+      .replace(/&amp;/gi, "&")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'");
 
-    if (
-      value.startsWith("data:") ||
-      value.startsWith("blob:") ||
-      value.startsWith("javascript:")
-    ) return;
+    if (/^(data:|blob:|javascript:)/i.test(value)) {
+      return;
+    }
 
     try {
       const u = new URL(value, pageURL);
 
       if (u.protocol !== "https:") return;
 
+      if (!ALLOWED_HOSTS.has(u.hostname.toLowerCase())) {
+        return;
+      }
+
       results.set(u.href, {
         url: u.href,
         source,
-        type: u.pathname.toLowerCase().endsWith(".m3u8")
-          ? "HLS"
-          : u.pathname.toLowerCase().endsWith(".mpd")
-          ? "DASH"
-          : u.pathname.toLowerCase().endsWith(".mp4")
-          ? "MP4"
-          : "Unknown"
+        type: videoType(u.href)
       });
-    } catch {}
+    } catch {
+      // Invalid URL ignored.
+    }
   }
 
-  // Video and source HTML elements
   const tags = html.match(/<(?:video|source)\b[^>]*>/gi) || [];
 
   for (const tag of tags) {
     const match = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
 
-    if (match) add(match[1], "HTML video/source");
+    if (match) {
+      add(match[1], "HTML video/source");
+    }
   }
 
-  // Open Graph and Twitter video metadata
   const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
 
   for (const tag of metaTags) {
@@ -189,23 +203,43 @@ function extractVideos(html, pageURL) {
   return [...results.values()];
 }
 
-async function analyze(url) {
-  const response = await safeFetch(url, {
+async function analyze(value) {
+  const target = validateURL(value);
+
+  // Direct video URL detection
+  const response = await safeFetch(target.href, {
     "User-Agent": "Mozilla/5.0",
-    "Accept": "text/html"
+    "Accept": "text/html,video/*,*/*"
   });
 
   if (!response.ok) {
     throw new Error("Website returned HTTP " + response.status);
   }
 
-  const type = response.headers.get("Content-Type") || "";
+  const contentType = (
+    response.headers.get("Content-Type") || ""
+  ).toLowerCase();
 
-  if (!type.toLowerCase().includes("text/html")) {
-    throw new Error("URL did not return an HTML webpage.");
+  if (contentType.startsWith("video/")) {
+    return json({
+      success: true,
+      message: "Direct video detected.",
+      count: 1,
+      videos: [{
+        url: target.href,
+        source: "Direct URL",
+        type: videoType(target.href, contentType)
+      }]
+    });
   }
 
-  const length = Number(response.headers.get("Content-Length") || 0);
+  if (!contentType.includes("text/html")) {
+    throw new Error("URL did not return HTML or a direct video.");
+  }
+
+  const length = Number(
+    response.headers.get("Content-Length") || 0
+  );
 
   if (length > MAX_HTML_BYTES) {
     throw new Error("HTML page is too large.");
@@ -213,8 +247,7 @@ async function analyze(url) {
 
   const bytes = await readLimited(response, MAX_HTML_BYTES);
   const html = new TextDecoder().decode(bytes);
-
-  const videos = extractVideos(html, url);
+  const videos = extractVideos(html, target.href);
 
   return json({
     success: true,
@@ -226,52 +259,46 @@ async function analyze(url) {
   });
 }
 
-async function download(url) {
-  const response = await safeFetch(url, {
+async function download(value) {
+  const target = validateURL(value);
+
+  const response = await safeFetch(target.href, {
     "User-Agent": "Mozilla/5.0"
   });
 
   if (!response.ok) {
-    return json({ error: "Video request failed." }, 502);
+    return json({
+      error: "Video request failed with HTTP " + response.status
+    }, 502);
   }
 
-  const type = response.headers.get("Content-Type") || "";
+  const type = (
+    response.headers.get("Content-Type") || ""
+  ).toLowerCase();
 
-  if (!type.toLowerCase().startsWith("video/")) {
-    return json({ error: "Direct video file not detected." }, 415);
+  if (!type.startsWith("video/")) {
+    return json({
+      error: "Direct video file not detected."
+    }, 415);
   }
 
-  const length = Number(response.headers.get("Content-Length") || 0);
-
-  if (length > MAX_BYTES) {
-    return json({ error: "Video exceeds 50 MB limit." }, 413);
-  }
-
-  if (!response.body) {
-    return json({ error: "Empty video response." }, 502);
-  }
-
-  let total = 0;
-
-  const limitedStream = response.body.pipeThrough(
-    new TransformStream({
-      transform(chunk, controller) {
-        total += chunk.byteLength;
-
-        if (total > MAX_BYTES) {
-          controller.error(new Error("Video size limit exceeded."));
-          return;
-        }
-
-        controller.enqueue(chunk);
-      }
-    })
+  const length = Number(
+    response.headers.get("Content-Length") || 0
   );
 
-  return new Response(limitedStream, {
+  if (length > MAX_BYTES) {
+    return json({
+      error: "Video exceeds 50 MB limit."
+    }, 413);
+  }
+
+  const bytes = await readLimited(response, MAX_BYTES);
+
+  return new Response(bytes, {
     headers: {
       ...CORS,
       "Content-Type": type,
+      "Content-Length": String(bytes.length),
       "Content-Disposition": 'attachment; filename="video.mp4"',
       "Cache-Control": "no-store"
     }
@@ -290,31 +317,31 @@ export default {
 
     const url = new URL(request.url);
 
+    if (url.pathname === "/") {
+      return json({
+        success: true,
+        status: "online",
+        app: "Universal Video Downloader",
+        endpoints: ["/analyze?url=...", "/download?url=..."]
+      });
+    }
+
+    if (url.pathname !== "/analyze" && url.pathname !== "/download") {
+      return json({ error: "Endpoint not found." }, 404);
+    }
+
+    const target = url.searchParams.get("url");
+
+    if (!target) {
+      return json({ error: "Missing URL parameter." }, 400);
+    }
+
     try {
-      if (url.pathname === "/") {
-        return json({
-          success: true,
-          service: "Universal Video Downloader",
-          endpoints: ["/analyze", "/download"]
-        });
-      }
-
-      const target = url.searchParams.get("url");
-
-      if (!target) {
-        return json({ error: "Missing URL parameter." }, 400);
-      }
-
       if (url.pathname === "/analyze") {
         return await analyze(target);
       }
 
-      if (url.pathname === "/download") {
-        return await download(target);
-      }
-
-      return json({ error: "Endpoint not found." }, 404);
-
+      return await download(target);
     } catch (error) {
       return json({
         success: false,
