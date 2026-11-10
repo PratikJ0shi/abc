@@ -1,0 +1,104 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Video Downloader</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #101827;
+      color: white;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 550px;
+      background: #1e293b;
+      padding: 35px;
+      border-radius: 18px;
+      text-align: center;
+    }
+
+    h1 { color: #38bdf8; }
+
+    p { color: #cbd5e1; }
+
+    input {
+      width: 100%;
+      padding: 15px;
+      margin: 20px 0;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      background: #0f172a;
+      color: white;
+      font-size: 15px;
+    }
+
+    button {
+      width: 100%;
+      padding: 15px;
+      background: #0284c7;
+      color: white;
+      border: 0;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover { background: #0369a1; }
+
+    #status {
+      margin-top: 20px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Video Downloader</h1>
+    <p>Paste your direct video URL below</p>
+
+    <input
+      type="url"
+      id="videoUrl"
+      placeholder="https://example.com/video.mp4"
+    >
+
+    <button onclick="downloadVideo()">
+      Download Video
+    </button>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    function downloadVideo() {
+      const url = document.getElementById("videoUrl").value;
+      const status = document.getElementById("status");
+
+      try {
+        const parsed = new URL(url);
+
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          throw new Error("Invalid URL");
+        }
+
+        status.textContent =
+          "URL received. Backend connection is the next step.";
+
+      } catch (error) {
+        status.textContent = "Please enter a valid video URL.";
+      }
+    }
+  </script>
+</body>
+</html>
